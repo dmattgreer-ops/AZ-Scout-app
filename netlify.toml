@@ -4,6 +4,9 @@
 [build.environment]
   NODE_VERSION = "22"
 
+[functions]
+  timeout = 30
+
 [[headers]]
   for = "/*"
   [headers.values]

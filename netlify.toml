@@ -1,15 +1,24 @@
-[build]
+[
+build]
   functions = "netlify/functions"
 
-[build.environment]
-  NODE_VERSION = "22"
+  [
+  build.environment
+  ]
+    NODE_VERSION + "22"
 
-[functions]
-  timeout = 30
+    [
+    functions
+    ]
+      timeout = 30
 
-[[headers]]
-  for = "/*"
-  [headers.values]
-    X-Frame-Options = "DENY"
-    X-Content-Type-Options = "nosniff"
-    Referrer-Policy = "strict-origin-when-cross-origin"
+      [[
+      headers
+      ]]
+        for =/*"
+        [
+        headers.values
+        ]
+          x-Frame-Options = "DENY"
+          x-content-Type-Options = "nosniff"
+          Referrer-Policy = "strict-origin-when-cross-origin"

@@ -571,7 +571,12 @@ SCOUTING WINDOW: ${scoutStart} to ${scoutEnd} (${scoutMonths})
 HUNT WINDOW: ${huntStart} to ${huntEnd} (${huntMonths})
 ${notes ? `FIELD NOTES: ${notes}` : ''}
 
-Center coordinates of this GMU area: approximately ${center[0].toFixed(3)}°N, ${Math.abs(center[1]).toFixed(3)}°W
+STRICT COORDINATE BOUNDS FOR GMU ${gmu}:
+  Latitude:  ${(center[0] - 0.35).toFixed(4)} to ${(center[0] + 0.35).toFixed(4)}
+  Longitude: ${(center[1] - 0.35).toFixed(4)} to ${(center[1] + 0.35).toFixed(4)}
+  Center: ${center[0].toFixed(4)}, ${center[1].toFixed(4)}
+
+CRITICAL: Every single lat/lng coordinate you return MUST fall within those bounds above. Do not place any pin outside this box.
 
 Return ONLY a valid JSON object, no markdown, no explanation. Format:
 {
@@ -605,8 +610,8 @@ Return ONLY a valid JSON object, no markdown, no explanation. Format:
 }
 
 Rules:
-- Return 3 scout locations and 3 hunt locations
-- Coordinates must be realistic for GMU ${gmu} Arizona (within ~0.3 degrees of ${center[0].toFixed(2)}, ${center[1].toFixed(2)})
+- Return 4-6 scout locations and 4-6 hunt locations
+- ALL coordinates MUST be within the bounding box specified above. Latitude between ${(center[0]-0.35).toFixed(4)} and ${(center[0]+0.35).toFixed(4)}, Longitude between ${(center[1]-0.35).toFixed(4)} and ${(center[1]+0.35).toFixed(4)}
 - sharedLocationIds lists hunt location IDs that correspond to the same general area as a scout location (these become purple pins)
 - Base recommendations on real Arizona terrain, vegetation zones, elevation bands, water sources, and known animal behavior for this species
 - Scouting recs focus on sign detection, glassing, pattern finding; hunt recs focus on setups, shot opportunities, approach routes
@@ -618,7 +623,7 @@ Rules:
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 1500,
+        max_tokens: 4000,
         messages: [{ role: 'user', content: prompt }]
       })
     });
@@ -689,9 +694,17 @@ function renderResults(analysis, gmu) {
   const sharedHuntIds = new Set(analysis.sharedLocationIds || []);
   let totalPins = 0;
 
+  // Get current GMU center for bounds validation
+  const gmuKey = Object.keys(AZ_GMU_CENTERS).find(k => k === gmu.toUpperCase() || k === gmu.toUpperCase().replace(/^0/, ''));
+  const c = gmuKey ? AZ_GMU_CENTERS[gmuKey] : [34.2, -111.5];
+  const latMin = c[0] - 0.5, latMax = c[0] + 0.5;
+  const lngMin = c[1] - 0.5, lngMax = c[1] + 0.5;
+  const inBounds = (lat, lng) => lat >= latMin && lat <= latMax && lng >= lngMin && lng <= lngMax;
+
   // Scout pins (blue), skip if also in shared (those become purple on hunt side)
   const scoutById = {};
   (analysis.scoutLocations || []).forEach((loc, i) => {
+    if (!inBounds(loc.lat, loc.lng)) { console.warn('Scout pin out of bounds, skipping:', loc.title, loc.lat, loc.lng); return; }
     scoutById[loc.id] = loc;
     const color = '#3b8fff';
     const marker = L.marker([loc.lat, loc.lng], { icon: makePin(color, `S${i+1}`) });
@@ -707,6 +720,7 @@ function renderResults(analysis, gmu) {
 
   // Hunt pins — purple if shared, red if not
   (analysis.huntLocations || []).forEach((loc, i) => {
+    if (!inBounds(loc.lat, loc.lng)) { console.warn('Hunt pin out of bounds, skipping:', loc.title, loc.lat, loc.lng); return; }
     const isShared = sharedHuntIds.has(loc.id);
     const color = isShared ? '#9b5fe0' : '#ff3b3b';
     const label = isShared ? `P${i+1}` : `H${i+1}`;
